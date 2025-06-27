@@ -33,9 +33,9 @@ GENOMIC = DomainConfig(
         "table": "table_summaries",
     },
     embed_models={
-        "text":  "gemini-embedding-004",
-        "image": "gemini-embedding-004",
-        "table": "gemini-embedding-004",
+        "text":  "models/text-embedding-004",
+        "image": "models/text-embedding-004",
+        "table": "models/text-embedding-004",
     },
     object_store_dirs={
     "image": Path("object_store/images"),
