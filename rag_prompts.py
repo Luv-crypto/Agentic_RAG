@@ -136,7 +136,21 @@ def ctx_builder_genomic(docs: list[str],
 
 
 
+def genomic_meta_from_text(question: str) -> Dict[str, Any]:
+    """
+    Wraps your existing QUERY_PROMPT block *unchanged* and returns
+    a JSON dict with whatever fields Gemini extracts.
+    """
+    META_PROMPT = textwrap.dedent("""\
+        Extract the following fields from the first-page text of a paper.
+        Return ONLY valid JSON:
+        { "title":string, "authors":[…], "abstract":string, "keywords":[…],
+        "Diseases":[…], "Methodology":string }
+        Text:
+        """)
 
+    raw_json = _gem_chat(META_PROMPT + question)
+    return _safe_json(raw_json)
 
 
 
