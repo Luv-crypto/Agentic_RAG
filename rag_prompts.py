@@ -2,6 +2,13 @@ import json
 from typing import Dict, List, Tuple, Any
 from utils import _gem_chat, _safe_json ,_fmt_list
 import textwrap
+import google.generativeai as genai
+from dotenv import load_dotenv
+import os
+
+
+load_dotenv()
+
 
 
 
@@ -42,7 +49,7 @@ def _gen_image_summary(path: str,
         "  • Guessing beyond image + caption + metadata.\n"
         "  • Generic filler (e.g., “This is a figure…”).\n\n"
     )
-
+    print(title)
     with open(path, "rb") as f:
         parts = [
             {"mime_type": "image/png", "data": f.read()},
@@ -52,7 +59,8 @@ def _gen_image_summary(path: str,
             f"Metadata  : {json.dumps(meta, ensure_ascii=False)}\n\n"
             "Write the summary:"
         ]
-    return _gem_chat(parts)
+    return _gem_chat(parts) 
+
 
 
 # ---------------------------------------------------------------------
@@ -133,6 +141,9 @@ def ctx_builder_genomic(docs: list[str],
         ctx.append("\n## Linked tables")
         for tb in tbls_final.values():
             ctx.append(f"* (tbl:{tb['id']}) {tb['summary']}")
+    
+    
+    return ctx
 
 
 
@@ -168,7 +179,7 @@ def genomic_meta_from_question(question: str) -> Dict[str, Any]:
       "keywords":[…], "methodology":string }
     Query:
     """).strip()
-
+   
     raw_json = _gem_chat(QUERY_PROMPT + question)
     return _safe_json(raw_json)
 
@@ -228,13 +239,16 @@ def build_full_prompt_genomic(ctx_chunks: List[str], question: str) -> str:
       on its own line (no other text on that line).
     """).strip()
 
-    return textwrap.dedent(f"""{FULL_PROMPT_HEADER}
+    prompt = textwrap.dedent(f"""{FULL_PROMPT_HEADER}
 
     --- MATERIAL ---
-    {''.join(ctx_chunks)}
+    {''.join(ctx_chunks)} 
     --- END MATERIAL ---
 
     Question: "{question}"
     """).strip()
+
+
+    return _gem_chat(prompt)
 
  

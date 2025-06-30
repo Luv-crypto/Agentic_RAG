@@ -1,4 +1,6 @@
 
+import faulthandler, sys, traceback
+faulthandler.enable()      # prints traceback even inside threads
 
 import os, uuid, datetime, json, markdown2
 from pathlib import Path
@@ -365,8 +367,6 @@ def ingest_status(task_id):
 
 # ───────── main ─────────
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000,
-            debug=True,
-            use_reloader=False)   # ← add this
+    app.run(host="127.0.0.1", port=5000,debug=True)   # ← add this
 
 

@@ -17,6 +17,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")      # ← Set your own Gemini API 
 MODEL_GEN      = "models/gemini-1.5-flash-latest"
 if not GEMINI_API_KEY:
     raise RuntimeError("Set GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
 _gem = genai.GenerativeModel(MODEL_GEN)
 
 
@@ -45,7 +46,7 @@ def _embed(texts: List[str], model: str | None = None) -> List[List[float]]:
     texts : list[str]
     model : overrides the default embedding model when provided
     """
-    model_name = model    # ← falls back to global default
+    model_name = model    # ← falls back to global defaul
     return genai.embed_content(
         model=model_name,
         content=texts,
@@ -180,7 +181,7 @@ def _candidate_filters(meta: Dict) -> List[Dict]:
 
 
 def _top_media_by_similarity(question_vec: List[float],
-                             media: Dict[str, Dict],
+                             media: Dict[str, Dict],model:str,
                              top_n: int = 2) -> List[str]:
     """
     Given a dict of media (key=media_id, value=metadata including “summary”),
@@ -192,7 +193,7 @@ def _top_media_by_similarity(question_vec: List[float],
 
     ids_list    = list(media.keys())
     summaries   = [media[mid]["summary"] for mid in ids_list]
-    sum_vecs    = _embed(summaries)   # embeddings for all summaries
+    sum_vecs    = _embed(summaries, model=model)   # embeddings for all summaries
     q = question_vec
     sims = [ dot(q, v) / (norm(q)*norm(v) + 1e-9) for v in sum_vecs ]
 
