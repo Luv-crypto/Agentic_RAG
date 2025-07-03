@@ -1,16 +1,7 @@
 import json
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 from utils import _gem_chat, _safe_json ,_fmt_list
 import textwrap
-import google.generativeai as genai
-from dotenv import load_dotenv
-import os
-
-
-load_dotenv()
-
-
-
 
 
 # ---------------------------------------------------------------------
