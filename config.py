@@ -38,8 +38,8 @@ GENOMIC = DomainConfig(
         "table": "models/text-embedding-004",
     },
     object_store_dirs={
-    "image": Path("object_store/images"),
-    "table": Path("object_store/tables")},
+    "image": Path("object_store/genomic/images"),
+    "table": Path("object_store/genomic/tables")},
     meta_schema={
         "title": str,
         "authors": list,
@@ -48,7 +48,7 @@ GENOMIC = DomainConfig(
         "keywords": list,
         "Methodology": str,
     },
-    allowed_meta_keys=["title","authors","Diseases","keywords","methodology"],
+    allowed_meta_keys=["title","authors","Diseases","keywords","methodology","abstract"],
     ctx_builder=ctx_builder_genomic,
     prompt_builders={
         "image": _gen_image_summary,
@@ -59,4 +59,41 @@ GENOMIC = DomainConfig(
     },
 )
 
-ALL_DOMAINS = {"GENOMIC": GENOMIC}
+
+
+CYBERSEC = DomainConfig(
+    name="cybersecurity",
+    chroma_root=Path("chroma_cyberpdfs"),
+    collection_names={
+        "text":  "scientific_chunks",
+        "image": "image_summaries",
+        "table": "table_summaries",
+    },
+    embed_models={
+        "text":  "models/text-embedding-004",
+        "image": "models/text-embedding-004",
+        "table": "models/text-embedding-004",
+    },
+    object_store_dirs={
+    "image": Path("object_store/cybersec/images"),
+    "table": Path("object_store/cybersec/tables")},
+    meta_schema={
+        "title": str,
+        "authors": list,
+        "abstract": str,
+        "keywords": list,
+        "Methodology": str,
+    },
+    allowed_meta_keys=["title","authors","keywords","methodology","abstract"],
+    ctx_builder=ctx_builder_genomic,
+    prompt_builders={
+        "image": _gen_image_summary,
+        "table": _gen_table_summary,
+        "meta_generation" : genomic_meta_from_text,
+        "meta_extraction" : genomic_meta_from_question,
+        "query": build_full_prompt_genomic,
+    },
+)
+
+
+ALL_DOMAINS = {"GENOMIC": GENOMIC, "CYBERSEC":CYBERSEC}

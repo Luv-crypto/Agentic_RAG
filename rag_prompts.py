@@ -242,4 +242,194 @@ def build_full_prompt_genomic(ctx_chunks: List[str], question: str) -> str:
 
     return _gem_chat(prompt)
 
+
+
+########################## Cybersec ##########################
+
+
+# ⇢ rag_prompts.py  (append right after the GENOMIC definitions)
+# ────────────────────────────────────────────────────────────────
+# CYBER-SECURITY   ⇢ five functions, 1-for-1 with the genomic set
+# ────────────────────────────────────────────────────────────────
+def _gen_image_summary_cyber(path: str,
+                              caption: str,
+                              meta: Dict[str, Any],
+                              max_words: int = 200) -> str:
+    """
+    Same idea as the genomic version, but without the “Diseases” field
+    and with cyber-security wording.
+    """
+    title    = meta.get("title", "")
+    keywords = _fmt_list(meta.get("keywords", []))
+
+    context_bits = [
+        f'from the paper titled “{title}”' if title else "",
+        f"({keywords})" if keywords else ""
+    ]
+    context = " ".join(b for b in context_bits if b).strip()
+
+    prompt_header = (
+        "You are an expert cyber-security writer helping a RAG system.\n"
+        f"Write a concise, retrieval-friendly figure summary (≤ {max_words} words).\n\n"
+        "✱ Include\n"
+        "  • Security topic (malware, CSIRT, threat vector…)\n"
+        "  • What the image visually shows (flows, charts, metrics).\n"
+        "  • Any numerical or categorical results visible.\n"
+        "✱ Avoid guessing beyond image + caption + metadata.\n\n"
+    )
+
+    with open(path, "rb") as f:
+        parts = [
+            {"mime_type": "image/png", "data": f.read()},
+            prompt_header +
+            f"Context  : {context or 'N/A'}\n"
+            f"Caption   : {caption or 'N/A'}\n"
+            f"Metadata  : {json.dumps(meta, ensure_ascii=False)}\n\n"
+            "Write the summary:"
+        ]
+    return _gem_chat(parts)            # same wrapper
+
+# -----------------------------------------------------------------
+def _gen_table_summary_cyber(table_md: str,
+                             caption: str,
+                             meta: Dict[str, Any],
+                             max_words: int = 200) -> str:
+    """
+    Cyber-security table summary (no Diseases field).
+    """
+    title     = meta.get("title", "")
+    method    = meta.get("Methodology", "")
+    keywords  = _fmt_list(meta.get("keywords", []))
+
+    context_bits = [
+        f'from “{title}”' if title else "",
+        f"using {method}" if method else "",
+        f"({keywords})"  if keywords else "",
+    ]
+    context = " ".join(b for b in context_bits if b).strip()
+
+    prompt = f"""
+You are an expert cyber-security writer helping a RAG system.
+
+Task: Write a succinct (≤ {max_words} words) retrieval-friendly table
+summary that embeds study context and key metrics.
+
+✱ Must cover
+  • Security context (topic / method) in one clause.
+  • What metrics the table reports (precision, mean-time-to-detect, etc.).
+  • Any standout values or comparisons.
+  • Clarify the caption if it uses abbreviations.
+
+✱ Data provided
+  • Table (first 4000 chars of Markdown):
+{table_md[:4000]}
+
+  • Caption  : {caption or 'N/A'}
+  • Context  : {context or 'N/A'}
+  • Full metadata (JSON, do **not** dump): {json.dumps(meta, ensure_ascii=False)}
+
+Write the summary now:
+"""
+    return _gem_chat(prompt).strip()
+
+# -----------------------------------------------------------------
+def ctx_builder_cyber(docs: List[str],
+                      metas: List[dict],
+                      imgs_final: dict,
+                      tbls_final: dict) -> List[str]:
+    """
+    Builds the “### Doc i” + linked images / tables block for CYBERSEC.
+    """
+    ctx: List[str] = []
+    for i, (doc_text, meta) in enumerate(zip(docs, metas), start=1):
+        ctx.append(
+            f"\n### Doc {i} (chunk {meta['chunk_id'][:8]})"
+            f"\nTitle   : {meta.get('title', '')}"
+            f"\nAuthors : {meta.get('authors', '')}"
+            f"\nAbstract: {meta.get('abstract', '')}"
+            f"\nKeywords: {meta.get('keywords', '')}"
+            f"\n---\n{doc_text[:1500]}\n"
+        )
+    if imgs_final:
+        ctx.append("\n## Linked images")
+        ctx += [f"* (img:{m['id']}) {m['summary']}" for m in imgs_final.values()]
+    if tbls_final:
+        ctx.append("\n## Linked tables")
+        ctx += [f"* (tbl:{t['id']}) {t['summary']}" for t in tbls_final.values()]
+    return ctx
+
+# -----------------------------------------------------------------
+def cyber_meta_from_text(text: str) -> Dict[str, Any]:
+    """
+    First-page PDF → JSON metadata extractor for CYBERSEC.
+    """
+    META_PROMPT = textwrap.dedent("""\
+        Extract the following fields from the first-page text of a cyber-security paper.
+        Return ONLY valid JSON:
+        { "title":string, "authors":[…], "abstract":string,
+          "keywords":[…], "Methodology":string }
+        Text:
+    """)
+    return _safe_json(_gem_chat(META_PROMPT + text))
+
+# -----------------------------------------------------------------
+def cyber_meta_from_question(question: str) -> Dict[str, Any]:
+    """
+    User query → filter JSON (no Diseases key).
+    """
+    QUERY_PROMPT = textwrap.dedent("""\
+        Extract any of these fields from the user query (return valid JSON):
+        { "title":string, "authors":[…], "keywords":[…], "methodology":string }
+        Query:
+    """)
+    return _safe_json(_gem_chat(QUERY_PROMPT + question))
+
+# -----------------------------------------------------------------
+def build_full_prompt_cyber(ctx_chunks: List[str], question: str) -> str:
+    """
+    Few-shot template adapted to cyber-security (CSIRT example).
+    """
+    HEADER = textwrap.dedent("""
+        You are given text chunks from cyber-security papers plus
+        concise summaries of images and tables that might belong to them.
+
+        • Answer **only** with the provided material.
+        • Cite chunks as (Doc 1), (Doc 2)… .
+        • If an image or table is essential, output exactly
+          <<img:FULL_UUID>> or <<tbl:FULL_UUID>> on its own line.
+
+        --- EXAMPLE ---
+
+        CONTEXT:
+        ### Doc 1
+        Title  : Cybersecurity Culture in CSIRTs
+        ---
+        “Issues such as communication, coordination and trust were rated as … ”
+
+        ## Linked tables
+        * (tbl:abcd1234…) Responses of 25 CSIRT professionals by obstacle.
+
+        QUESTION:
+        List two key obstacles a CSIRT faces during incident handling.
+
+        ANSWER:
+        The survey highlights poor information flow (Doc 1) and lack of cross-team
+        collaboration (Doc 1) as the two main obstacles.
+        <<tbl:abcd1234…>>
+
+        --- END EXAMPLE ---
+    """).strip()
+
+    prompt = textwrap.dedent(f"""{HEADER}
+
+    --- MATERIAL ---
+    {''.join(ctx_chunks)}
+    --- END MATERIAL ---
+
+    Question: "{question}"
+    """).strip()
+
+    return _gem_chat(prompt)
+
+
  

@@ -1,5 +1,5 @@
 
-import faulthandler, sys, traceback
+import faulthandler
 faulthandler.enable()      # prints traceback even inside threads
 
 import os, uuid, datetime, json, markdown2
@@ -7,14 +7,15 @@ from pathlib import Path
 from typing import List, Tuple
 import threading, secrets, queue
 import sqlite3, hashlib, secrets
-
+import re
+from config import ALL_DOMAINS
+from agentic_rag_agent import get_agent
 from flask import (
     Flask, request, jsonify, render_template,
     send_from_directory, make_response ,redirect, url_for, Response
     )
 
 # ---------- your RAG core (imported) ---------------------------
-from rag_scipdf_core import smart_query   # <- must be importable!
 from dotenv import load_dotenv
 
 # Load .env into process environment
@@ -56,27 +57,54 @@ def _chat_key(req) -> str:
 
 
 
+        # ← only the autonomous agent
+# -----------------------------------------------------------------------
+
+# pre-compute every domain’s image / table directory
+IMAGE_DIRS = {cfg.object_store_dirs["image"].resolve()
+              for cfg in ALL_DOMAINS.values()}
+TABLE_DIRS = {cfg.object_store_dirs["table"].resolve()
+              for cfg in ALL_DOMAINS.values()}
+
+MEDIA_TOKEN_RE = re.compile(r"<<(img|tbl):([0-9A-Fa-f]{8}|[0-9A-Fa-f\-]{32,36})>>")
+
 def _run_rag(prompt: str) -> Tuple[str, List[Tuple[str, str]]]:
     """
-    Wrapper around rag_scipdf_core.smart_query().
-    Returns:
-      html_answer  – safe HTML (markdown → html)
-      media_list   – [("img", rel_path | url), ("tbl", rel_path | url), …]
+    Pure agent wrapper — no direct smart_query.
+
+    Returns
+    -------
+    html_answer : safe HTML string
+    media_list  : [("img", url), ("tbl", url), …]  (may be empty)
     """
     uid = _current_uid(request)
-    answer_text, media = smart_query(prompt, user_id= uid , return_media=True)  # <-- small helper added in rag_scipdf_core
-    # answer_text is markdown.  Convert ↓
-    html_answer = markdown2.markdown(answer_text, extras=["fenced-code-blocks", "tables"])
+    agent = get_agent(uid)                   # ← user-scoped agent
+    answer_md = agent.run(prompt)
+    html_answer = markdown2.markdown(
+        answer_md, extras=["fenced-code-blocks", "tables"]
+    )
 
-    # Convert media paths (object_store/…) → url routes /media/…
-    show = []
-    for kind, p in media:
-        p = Path(p).resolve()
-        if kind == "img" and OBJ_DIR_IMG in p.parents:
-            show.append((kind, f"/media/image/{p.name}"))
-        elif kind == "tbl" and OBJ_DIR_TBL in p.parents:
-            show.append((kind, f"/media/table/{p.name}"))
-    return html_answer, show
+    # 📌 2) If agent embedded media tokens, resolve them → /media/… URLs
+    media_show: List[Tuple[str, str]] = []
+
+    for kind, token in MEDIA_TOKEN_RE.findall(answer_md):
+        kind = kind.lower()
+        # find a matching file in every domain’s object-store
+        if kind == "img":
+            for img_dir in IMAGE_DIRS:
+                cand = next(img_dir.glob(f"{token}*"), None)
+                if cand:
+                    media_show.append((kind, f"/media/image/{cand.name}"))
+                    break
+        else:  # tbl
+            for tbl_dir in TABLE_DIRS:
+                cand = next(tbl_dir.glob(f"{token}*"), None)
+                if cand:
+                    media_show.append((kind, f"/media/table/{cand.name}"))
+                    break
+
+    return html_answer, media_show
+
 
 
 # ---------------- routes -----------------------------------------
