@@ -1,15 +1,4 @@
 
-    Agentic_RAG  
-    ============
-
-    📚 A next-generation Retrieval-Augmented Generation (RAG)
-    framework with a built-in AI “agent” that routes queries
-    and ingests into multiple domain‐specific vector stores
-    (currently Genomics & Cyber-security) using LangChain
-    and Google Gemini for embeddings & chat.
-
------------------------------------------------------------------------- -->
-
 # Agentic\_RAG
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
