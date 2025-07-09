@@ -168,6 +168,8 @@ To **add a new domain**:
 ├── utils.py             # Gemini + Chroma helper functions
 ├── agentic_rag_agent.py # LangChain agent entrypoint
 ├── tools_registry.py    # Tools registry
+├── domain_routing.py    # Guides ingestion and retrival processes
+├── logging_config.py    # Logging and monitoring
 ├── requirements.txt     # ✨ pinned dependencies
 ├── templates/           # Flask chat/upload/login views
 ├── static/              # CSS + JS assets
