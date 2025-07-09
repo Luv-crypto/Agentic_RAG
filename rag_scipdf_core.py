@@ -1,8 +1,6 @@
 # ----------------------------------------
 # rag_scipdf_core.py  – ingestion + retrieval
-from __future__ import annotations
-from config import GENOMIC          
-CFG = GENOMIC                        # later you can switch domains
+from __future__ import annotations                      # later you can switch domains
 import glob
 import re
 import uuid
@@ -15,19 +13,16 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
 from IPython.display import display, Markdown, Image
 from utils import get_chroma_collections, ensure_dirs,_flatten_meta, _embed, CAP_RE, _find_caption,_candidate_filters, _fetch_media_linked,_zip_ids_meta,_top_media_by_similarity
+from config import ALL_DOMAINS
+from domain_routing import choose_domain
+from logging_config import logger
+
+
 
 
 
 nest_asyncio.apply()
 
-
-# one-time at startup
-ensure_dirs(CFG.object_store_dirs)
-collection_txt, collection_img, collection_tbl = get_chroma_collections(CFG)
-
-# handy aliases for object-store directories
-OBJ_DIR_IMG = CFG.object_store_dirs["image"]
-OBJ_DIR_TBL = CFG.object_store_dirs["table"]
 
 # ─────────────────── Docling converter ────────────────────────
 pipe_opts = PdfPipelineOptions(
@@ -74,6 +69,24 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
         # 1) Use Docling to convert → Markdown + page images + saved PNGs
         ddoc = converter.convert(p).document
         md   = ddoc.export_to_markdown()
+        
+        # 2) Pick domain & CFG for this document --------------------------
+        doc_domain = choose_domain(md[:2000])
+        if doc_domain is None:
+            print(f" No domain found for {p.name} – skipped.")
+            continue
+        CFG = ALL_DOMAINS[doc_domain]
+        logger.info(f"Started ingesting {p.name} for domain {doc_domain}")
+
+
+        # one-time per PDF: make sure object-store dirs exist
+        ensure_dirs(CFG.object_store_dirs)
+        collection_txt, collection_img, collection_tbl = get_chroma_collections(CFG)
+        OBJ_DIR_IMG = CFG.object_store_dirs["image"]
+        OBJ_DIR_TBL = CFG.object_store_dirs["table"]
+
+        # 3) Extract “global” metadata (title/authors/etc) from first ~1500 chars
+
 
         # 2) Extract “global” metadata (title/authors/etc) from first ~1500 chars
         meta_dict = CFG.prompt_builders["meta_generation"](md[:1500])
@@ -110,8 +123,9 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
                 continue
             pg = pic.prov[0].page_no if pic.prov else 1
             # Save PNG to object_store/images/
-            fn = f"{uuid.uuid4()}_{p.stem}_p{pg}.png"
-            fp = OBJ_DIR_IMG / fn
+            img_id = str(uuid.uuid4())                       # one UUID for both
+            fn     = f"{img_id}_{p.stem}_p{pg}.png"
+            fp     = OBJ_DIR_IMG / fn
             img.save(fp, "PNG")
             caption_image = pic.caption_text(ddoc) or "" 
             # Determine which text‐chunk “owns” this page:
@@ -120,7 +134,6 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
             # Summarize that figure (send PNG → Gemini)
             summ = CFG.prompt_builders["image"](**{ "path": str(fp),"caption": caption_image,"meta": meta_flat})
 
-            img_id     = str(uuid.uuid4())
             embed_text = f"{caption_image}\n\n{summ}" if caption_image else summ
 
             collection_img.add(
@@ -186,6 +199,7 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
                     "user_id" :user_id
                 }]
             )
+        logger.info(f"Ingested {len(chunk_ids)} chunks, {len(ddoc.pictures)} images")
 
 # ═══════════════════════════════════════════════════════════════
 # RETRIEVAL
@@ -210,6 +224,13 @@ def smart_query(
      6) Send to Gemini. If Gemini needs to actually show a figure or table, it writes exactly `<<img:ID8>>` or `<<tbl:ID8>>`
         (8 hex chars) or the full UUID (36 chars). We catch either format, look up path, and render inline.
     """
+
+    query_domain = choose_domain(question)
+    if query_domain is None:
+        return "❌ No domain found for this query.", [] if return_media else "❌ No domain found for this query."
+    CFG = ALL_DOMAINS[query_domain]
+    collection_txt, collection_img, collection_tbl = get_chroma_collections(CFG)
+
     # ── 1) Embed question + attempt metadata filters one by one ───────────
     q_vec = _embed([question],model=CFG.embed_models["text"])[0]
     meta_raw = CFG.prompt_builders["meta_extraction"](question)
