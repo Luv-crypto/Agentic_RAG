@@ -1,4 +1,3 @@
-
 # Agentic\_RAG
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
