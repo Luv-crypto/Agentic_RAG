@@ -166,7 +166,8 @@ To **add a new domain**:
 ├── rag_prompts.py       # All prompt-builder functions
 ├── rag_scipdf_core.py   # Ingestion + retrieval pipeline
 ├── utils.py             # Gemini + Chroma helper functions
-├── cyber_agent.py       # LangChain agent entrypoint
+├── agentic_rag_agent.py # LangChain agent entrypoint
+├── tools_registry.py    # Tools registry
 ├── requirements.txt     # ✨ pinned dependencies
 ├── templates/           # Flask chat/upload/login views
 ├── static/              # CSS + JS assets
