@@ -4,7 +4,8 @@ from typing import Callable, Dict, Any, List
 from rag_prompts import (
     _gen_image_summary, _gen_table_summary,   # low-level
     ctx_builder_genomic, genomic_meta_from_question,
-    build_full_prompt_genomic, genomic_meta_from_text
+    build_full_prompt_genomic, genomic_meta_from_text, 
+    cyber_meta_from_question, cyber_meta_from_text, ctx_builder_cyber, build_full_prompt_cyber, _gen_image_summary_cyber, _gen_table_summary_cyber
 )
 from pathlib import Path
 
@@ -85,13 +86,13 @@ CYBERSEC = DomainConfig(
         "Methodology": str,
     },
     allowed_meta_keys=["title","authors","keywords","methodology","abstract"],
-    ctx_builder=ctx_builder_genomic,
+    ctx_builder=ctx_builder_cyber,
     prompt_builders={
-        "image": _gen_image_summary,
-        "table": _gen_table_summary,
-        "meta_generation" : genomic_meta_from_text,
-        "meta_extraction" : genomic_meta_from_question,
-        "query": build_full_prompt_genomic,
+        "image": _gen_image_summary_cyber,
+        "table": _gen_table_summary_cyber,
+        "meta_generation" : cyber_meta_from_text,
+        "meta_extraction" : cyber_meta_from_question,
+        "query": build_full_prompt_cyber,
     },
 )
 

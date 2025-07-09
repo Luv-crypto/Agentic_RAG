@@ -1,10 +1,9 @@
 
 from __future__ import annotations
-import readline, os
-import functools, readline, os
+import os
+import functools
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import initialize_agent, AgentType
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import google.generativeai as genai
 from tools_registry import build_tools
 from dotenv import load_dotenv

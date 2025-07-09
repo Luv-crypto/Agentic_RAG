@@ -2,7 +2,6 @@
 # -------------------------------------------------------------
 from __future__ import annotations
 from pathlib import Path
-from typing import List, Any
 import google.generativeai as genai
 from langchain.tools import Tool
 from langchain_experimental.tools.python.tool import PythonREPLTool
@@ -47,7 +46,7 @@ def _ingest(path: str, user_id: int = 0) -> str:
 
 # 3) retrieve_rag tool (wrap smart_query)
 def _retrieve(q: str, user_id: int = 0, top_k: int = 3) -> str:
-    ans, _ = smart_query(q, user_id=user_id, top_k=top_k, return_media=False)
+    ans, _ = smart_query(q, user_id=user_id, top_k=top_k, return_media=True)
     return ans
 
 # 4) search_web tool (SerpAPI)
@@ -73,10 +72,31 @@ def build_tools(user_id: int):
              description="Classify raw text or a PDF path into a domain."),
         Tool(name="ingest_pdf", func=lambda p: _ingest(p, user_id),
              description="Ingest a PDF into the proper domain DB."),
-        Tool(name="retrieve_rag", func=lambda q: _retrieve(q, user_id),
-             description="Run RAG retrieval & answer from ingested PDFs."),
-        Tool(name="search_web", func=_search_web,
-             description="Web search via SerpAPI (domain-aware)."),
+        Tool(
+            name="retrieve_rag",
+            func=lambda q: _retrieve(q, user_id),
+            description=(
+                "PRIMARY ANSWER TOOL — MUST BE CALLED FIRST.\n"
+                "> Purpose: answer using PDFs already ingested.\n"
+                "> Usage: retrieve_rag(<user question>).\n"
+                "> Output: It returns full markdown with `<<img:UUID>>` and `<<tbl:UUID>>` tokens when media is available. \n"
+                "> Rule1: If you get such markdown, DO NOT edit it under any circumstajnces return the answer from the function as your final answer.\n"
+                "> Rule2: If it finds NOTHING, RETURN the SINGLE token 'NO_RESULTS'.\n"
+                "> Rule 3: NEVER call any other tool before this one."
+            ),
+            return_direct = True
+        ),
+        Tool(
+            name="search_web",
+            func=_search_web,
+            description=(
+                "FALLBACK SEARCH.\n"
+                "Call ONLY if the PREVIOUS ACTION was retrieve_rag and "
+                "it returned 'NO_RESULTS'.\n"
+                "Otherwise DO NOT call this tool."
+            ),
+        ),
+
         Tool(name="code_writer", func=_code_writer,
              description="Generate complete domain-aware code."),
         PythonREPLTool(),

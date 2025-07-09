@@ -2,17 +2,17 @@
 import faulthandler
 faulthandler.enable()      # prints traceback even inside threads
 
-import os, uuid, datetime, json, markdown2
+import os, uuid, datetime, markdown2
 from pathlib import Path
 from typing import List, Tuple
-import threading, secrets, queue
+import threading, secrets
 import sqlite3, hashlib, secrets
 import re
 from config import ALL_DOMAINS
 from agentic_rag_agent import get_agent
 from flask import (
     Flask, request, jsonify, render_template,
-    send_from_directory, make_response ,redirect, url_for, Response
+    send_from_directory ,redirect, url_for,abort
     )
 
 # ---------- your RAG core (imported) ---------------------------
@@ -24,8 +24,6 @@ load_dotenv()
 
 # ---------- constants ------------------------------------------
 ROOT               = Path(__file__).parent.resolve()
-OBJ_DIR_IMG        = ROOT / "object_store" / "images"
-OBJ_DIR_TBL        = ROOT / "object_store" / "tables"
 SESSION_COOKIE_KEY = "sid"
 
 # ---------- Flask -------------------------------------------------
@@ -84,26 +82,42 @@ def _run_rag(prompt: str) -> Tuple[str, List[Tuple[str, str]]]:
         answer_md, extras=["fenced-code-blocks", "tables"]
     )
 
-    # 📌 2) If agent embedded media tokens, resolve them → /media/… URLs
-    media_show: List[Tuple[str, str]] = []
 
+    media_show: List[Tuple[str, str]] = []
+    seen_files: set[str] = set()
+
+    # Collect every unique image/table token → URL
     for kind, token in MEDIA_TOKEN_RE.findall(answer_md):
         kind = kind.lower()
-        # find a matching file in every domain’s object-store
-        if kind == "img":
-            for img_dir in IMAGE_DIRS:
-                cand = next(img_dir.glob(f"{token}*"), None)
-                if cand:
-                    media_show.append((kind, f"/media/image/{cand.name}"))
-                    break
-        else:  # tbl
-            for tbl_dir in TABLE_DIRS:
-                cand = next(tbl_dir.glob(f"{token}*"), None)
-                if cand:
-                    media_show.append((kind, f"/media/table/{cand.name}"))
-                    break
+        prefix = token[:8].lower()  # 8-char UUID prefix
 
+        if kind == "img":
+            # search each domain folder for a matching PNG
+            for img_dir in IMAGE_DIRS:
+                for cand in img_dir.glob(f"{prefix}*"):
+                    fname = cand.name
+                    if fname not in seen_files:
+                        seen_files.add(fname)
+                        media_show.append(("img", f"/media/image/{fname}"))
+                    break
+                # continue to next token, don't break out completely
+
+        elif kind == "tbl":
+            # search each domain folder for a matching MD
+            for tbl_dir in TABLE_DIRS:
+                for cand in tbl_dir.glob(f"{prefix}*"):
+                    fname = cand.name
+                    if fname not in seen_files:
+                        seen_files.add(fname)
+                        media_show.append(("tbl", f"/media/table/{fname}"))
+                    break
+                # continue to next token
+
+    # ───────────────────────────────────────────────────────────────
+    # Now return the HTML + full media_show list (multiple entries allowed)
+    # ───────────────────────────────────────────────────────────────
     return html_answer, media_show
+
 
 
 
@@ -167,25 +181,29 @@ def chat_api():
 # expose figures / tables ------------------------------------------------
 @app.route("/media/image/<path:filename>")
 def media_image(filename):
-    return send_from_directory(OBJ_DIR_IMG, filename)
+    """Look for the image in any domain’s images/ folder."""
+    for fp in Path("object_store").rglob(f"images/{filename}"):
+        if fp.exists():
+            return send_from_directory(fp.parent, fp.name)
+    return abort(404, description="image not found")
+
 
 @app.route("/media/table/<path:filename>")
 def media_table(filename):
-    md_path = OBJ_DIR_TBL / filename
-    if not md_path.exists():
-        return "Not found", 404
+    """Look for the markdown table in any domain’s tables/ folder."""
+    for fp in Path("object_store").rglob(f"tables/{filename}"):
+        if fp.exists():
+            md_text = fp.read_text(encoding="utf-8")
+            html = markdown2.markdown(md_text, extras=["tables"])
+            css  = (
+                "<style>"
+                "table{border-collapse:collapse;width:100%;}"
+                "th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;}"
+                "</style>"
+            )
+            return f"<html><head>{css}</head><body>{html}</body></html>"
+    return abort(404, description="table not found")
 
-    md_text = md_path.read_text(encoding="utf-8")
-    html = markdown2.markdown(md_text, extras=["tables"])
-
-    # embed minimal CSS so the table is readable even inside the iframe
-    css = """
-      <style>
-        table{border-collapse:collapse;width:100%;}
-        th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;}
-      </style>
-    """
-    return f"<html><head>{css}</head><body>{html}</body></html>"
 
 
 
