@@ -3,7 +3,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](#requirements)
-[📄 Changelog](CHANGELOG.md) • [🤝 Contributing](#contributing)
+
 
 ---
 
