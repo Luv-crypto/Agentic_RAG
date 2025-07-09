@@ -91,12 +91,12 @@ Agentic\_RAG transforms your **static RAG pipeline** into a **dynamic AI-powered
 
 ### Installation
 
-1. **Clone** the repo and switch to the `Agent_infusion` branch:
+1. **Clone** the repo and switch to the `main` branch:
 
    ```bash
    git clone https://github.com/Luv-crypto/Agentic_RAG.git
    cd Agentic_RAG
-   git checkout Agent_infusion
+   git checkout main
    ```
 
 2. **Create & activate** a virtual environment:
@@ -113,56 +113,18 @@ Agentic\_RAG transforms your **static RAG pipeline** into a **dynamic AI-powered
    pip install -r requirements.txt
    ```
 
-4. **Configure** API keys:
-
-   ```bash
-   # create a .env in the project root:
-   echo "GEMINI_API_KEY=your_google_gemini_key" >> .env
-   echo "MODEL_GEN=models/gemini-1.5-flash-latest" >> .env
-   echo "MODEL_EMB=models/text-embedding-004" >> .env
-   ```
-
----
 
 ## 💻 Usage
 
-### 1. Ingest PDFs
+
+### 1. Run the Web App
 
 ```bash
-# Genomic ingestion:
-python - <<EOF
-from rag_scipdf_core import ingest_documents
-from config import GENOMIC
-ingest_documents("papers/genomic/**/*.pdf", user_id=1, cfg=GENOMIC)
-EOF
-
-# Cyber-security ingestion:
-python - <<EOF
-from rag_scipdf_core import ingest_documents
-from config import CYBERSEC
-ingest_documents("papers/cybersec/**/*.pdf", user_id=1, cfg=CYBERSEC)
-EOF
-```
-
-### 2. Run the Web App
-
-```bash
-export FLASK_APP=app.py
 python app.py
 ```
 
 Open your browser at [http://127.0.0.1:5000](http://127.0.0.1:5000)
 Upload PDFs, then chat!
-
-### 3. Query via the Agent (CLI)
-
-```bash
-# cyber_agent.py uses LangChain → zero-shot agent
-python cyber_agent.py
-# OR via Python
->>> from cyber_agent import ask_agent
->>> print(ask_agent("What communication challenges do CSIRTs face?"))
-```
 
 ---
 
