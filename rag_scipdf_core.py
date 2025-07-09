@@ -1,8 +1,6 @@
 # ----------------------------------------
 # rag_scipdf_core.py  – ingestion + retrieval
-from __future__ import annotations
-from config import GENOMIC          
-CFG = GENOMIC                        # later you can switch domains
+from __future__ import annotations                      # later you can switch domains
 import glob
 import re
 import uuid
@@ -74,12 +72,10 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
         
         # 2) Pick domain & CFG for this document --------------------------
         doc_domain = choose_domain(md[:2000])
-        print(doc_domain)
         if doc_domain is None:
             print(f" No domain found for {p.name} – skipped.")
             continue
         CFG = ALL_DOMAINS[doc_domain]
-        print(CFG)
         logger.info(f"Started ingesting {p.name} for domain {doc_domain}")
 
 
@@ -127,8 +123,9 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
                 continue
             pg = pic.prov[0].page_no if pic.prov else 1
             # Save PNG to object_store/images/
-            fn = f"{uuid.uuid4()}_{p.stem}_p{pg}.png"
-            fp = OBJ_DIR_IMG / fn
+            img_id = str(uuid.uuid4())                       # one UUID for both
+            fn     = f"{img_id}_{p.stem}_p{pg}.png"
+            fp     = OBJ_DIR_IMG / fn
             img.save(fp, "PNG")
             caption_image = pic.caption_text(ddoc) or "" 
             # Determine which text‐chunk “owns” this page:
@@ -137,7 +134,6 @@ def ingest_documents(pattern: str,user_id : int, chunk_size: int = 1500, stop_ev
             # Summarize that figure (send PNG → Gemini)
             summ = CFG.prompt_builders["image"](**{ "path": str(fp),"caption": caption_image,"meta": meta_flat})
 
-            img_id     = str(uuid.uuid4())
             embed_text = f"{caption_image}\n\n{summ}" if caption_image else summ
 
             collection_img.add(
